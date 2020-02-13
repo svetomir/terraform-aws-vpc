@@ -1,5 +1,3 @@
-# VPC
-
 resource "aws_vpc" "main" {
     cidr_block                       = var.vpc_cidr_block
     instance_tenancy                 = var.vpc_instance_tenancy
@@ -13,6 +11,10 @@ resource "aws_vpc" "main" {
         var.tags,
         {"Name" = var.vpc_name}
     )
+
+    lifecycle {
+        ignore_changes = [tags]
+    }
 }
 
 resource "aws_vpc_ipv4_cidr_block_association" "main" {
@@ -68,7 +70,7 @@ resource "aws_egress_only_internet_gateway" "main" {
 # NAT GATEWAYS
 
 resource "aws_eip" "nat_gw" {
-    count = length(var.public_subnets) > 0 ? length(var.public_subnets) : 0
+    count = local.nat_gateway_count
     
     vpc = true
 
@@ -79,7 +81,7 @@ resource "aws_eip" "nat_gw" {
 }
 
 resource "aws_nat_gateway" "main" {
-    count = length(var.public_subnets) > 0 ? length(var.public_subnets) : 0
+    count = local.nat_gateway_count
 
     allocation_id = aws_eip.nat_gw[count.index].id
     subnet_id     = aws_subnet.public[count.index].id
@@ -113,6 +115,10 @@ resource "aws_subnet" "persistence" {
         var.persistence_subnets[count.index].tags
     )
 
+    lifecycle {
+        ignore_changes = [tags]
+    }
+
     depends_on = [aws_vpc.main]
 }
 
@@ -135,6 +141,10 @@ resource "aws_subnet" "private" {
         var.private_subnets[count.index].tags
     )
 
+    lifecycle {
+        ignore_changes = [tags]
+    }
+
     depends_on = [aws_vpc.main]
 }
 
@@ -156,6 +166,10 @@ resource "aws_subnet" "public" {
         },
         var.public_subnets[count.index].tags
     )
+
+    lifecycle {
+        ignore_changes = [tags]
+    }
 
     depends_on = [aws_vpc.main]
 }
@@ -203,34 +217,42 @@ resource "aws_redshift_subnet_group" "redshift" {
 # ROUTING
 
 resource "aws_route_table" "persistence" {
-    count = length(var.persistence_subnets) > 0 ? 1 : 0
+    count = length(var.persistence_subnets) > 0 ? local.nat_gateway_count : 0
     
     vpc_id = aws_vpc.main.id
     
     tags = merge(
         var.tags,
         {
-            Name = format("%s-persistence", var.vpc_name)
+            Name = var.single_nat_gateway ? format("%s-persistence", var.vpc_name) : format("%s-persistence-%s", var.vpc_name, count.index)
         }
     )
 }
 
 resource "aws_route_table_association" "persistence" {
-  count = length(var.persistence_subnets) > 0 ? length(var.persistence_subnets) : 0
+    count = length(var.persistence_subnets) > 0 ? length(var.persistence_subnets) : 0
+    
+    subnet_id = element(aws_subnet.persistence.*.id, count.index)
+    route_table_id = element(aws_route_table.persistence.*.id, var.single_nat_gateway ? 0 : count.index)
+}
 
-  subnet_id = element(aws_subnet.persistence.*.id, count.index)
-  route_table_id = aws_route_table.persistence.0.id
+resource "aws_route" "persistence_nat_gateway" {
+    count = length(var.persistence_subnets) > 0 ? local.nat_gateway_count : 0
+    
+    route_table_id         = element(aws_route_table.persistence.*.id, count.index)
+    destination_cidr_block = "0.0.0.0/0"
+    nat_gateway_id         = element(aws_nat_gateway.main.*.id, count.index)
 }
 
 resource "aws_route_table" "private" {
-    count = length(var.private_subnets) > 0 ? length(var.private_subnets) : 0
+    count = length(var.private_subnets) > 0 ? local.nat_gateway_count : 0
     
     vpc_id = aws_vpc.main.id
     
     tags = merge(
         var.tags,
         {
-            Name = format("%s-private-%s", var.vpc_name, count.index)
+            Name = var.single_nat_gateway ? format("%s-private", var.vpc_name) : format("%s-private-%s", var.vpc_name, count.index)
         }
     )
 }
@@ -239,11 +261,11 @@ resource "aws_route_table_association" "private" {
     count = length(var.private_subnets) > 0 ? length(var.private_subnets) : 0
     
     subnet_id = element(aws_subnet.private.*.id, count.index)
-    route_table_id = element(aws_route_table.private.*.id, count.index)
+    route_table_id = element(aws_route_table.private.*.id, var.single_nat_gateway ? 0 : count.index)
 }
 
 resource "aws_route" "private_nat_gateway" {
-    count = length(var.private_subnets) > 0 ? length(var.private_subnets) : 0
+    count = length(var.private_subnets) > 0 ? local.nat_gateway_count : 0
     
     route_table_id         = element(aws_route_table.private.*.id, count.index)
     destination_cidr_block = "0.0.0.0/0"

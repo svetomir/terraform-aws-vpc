@@ -3,7 +3,6 @@ variable "tags" {
     default     = {}
     description = "Key-value mapping of default tags for all IAM users."
 }
-# VPC
 variable "vpc_name" {
     type        = string
     description = "VPC name."
@@ -77,6 +76,12 @@ variable "dhcp_options_netbios_node_type" {
     type        = number
     default     = 2
     description = "The NetBIOS node type (1, 2, 4, or 8). AWS recommends to specify 2 since broadcast and multicast are not supported in their network."
+}
+# NAT GATEWAYS
+variable "single_nat_gateway" {
+    type        = bool
+    default     = false
+    description = "Weather or not to use single NAT gateway."
 }
 # SUBNETS
 variable "persistence_subnets" {
