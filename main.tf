@@ -76,7 +76,7 @@ resource "aws_eip" "nat_gw" {
 
     tags = merge(
         var.tags,
-        {"Name" = format("%s-%s", var.name, count.index)}
+        {"Name" = var.single_nat_gateway ? format("%s", var.name) : format("%s-%s", var.name, count.index)}
     )
 }
 
@@ -88,7 +88,7 @@ resource "aws_nat_gateway" "main" {
 
     tags = merge(
         var.tags,
-        {"Name" = format("%s-%s", var.name, count.index)}
+        {"Name" = var.single_nat_gateway ? format("%s", var.name) : format("%s-%s", var.name, count.index)}
     )
 
     depends_on = [aws_internet_gateway.main]
