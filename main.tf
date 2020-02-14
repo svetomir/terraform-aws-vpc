@@ -1,15 +1,15 @@
 resource "aws_vpc" "main" {
-    cidr_block                       = var.vpc_cidr_block
-    instance_tenancy                 = var.vpc_instance_tenancy
-    enable_dns_support               = var.vpc_enable_dns_support
-    enable_dns_hostnames             = var.vpc_enable_dns_hostnames
-    enable_classiclink               = var.vpc_enable_classiclink
-    enable_classiclink_dns_support   = var.vpc_enable_classiclink_dns_support
-    assign_generated_ipv6_cidr_block = var.vpc_assign_generated_ipv6_cidr_block
+    cidr_block                       = var.cidr_block
+    instance_tenancy                 = var.instance_tenancy
+    enable_dns_support               = var.enable_dns_support
+    enable_dns_hostnames             = var.enable_dns_hostnames
+    enable_classiclink               = var.enable_classiclink
+    enable_classiclink_dns_support   = var.enable_classiclink_dns_support
+    assign_generated_ipv6_cidr_block = var.assign_generated_ipv6_cidr_block
     
     tags = merge(
         var.tags,
-        {"Name" = var.vpc_name}
+        {"Name" = var.name}
     )
 
     lifecycle {
@@ -18,10 +18,10 @@ resource "aws_vpc" "main" {
 }
 
 resource "aws_vpc_ipv4_cidr_block_association" "main" {
-    count = length(var.vpc_additional_cidrs) > 0 ? length(var.vpc_additional_cidrs) : 0
+    count = length(var.additional_cidrs) > 0 ? length(var.additional_cidrs) : 0
 
     vpc_id     = aws_vpc.main.id
-    cidr_block = var.vpc_additional_cidrs[count.index]
+    cidr_block = var.additional_cidrs[count.index]
 }
 
 # VPC DHCP OPTIONS
@@ -37,7 +37,7 @@ resource "aws_vpc_dhcp_options" "main" {
     
     tags = merge(
         var.tags,
-        {"Name" = var.vpc_name}
+        {"Name" = var.name}
     )
 }
 
@@ -57,12 +57,12 @@ resource "aws_internet_gateway" "main" {
     
     tags = merge(
         var.tags,
-        {"Name" = var.vpc_name}
+        {"Name" = var.name}
     )
 }
 
 resource "aws_egress_only_internet_gateway" "main" {
-    count = var.vpc_assign_generated_ipv6_cidr_block && length(var.public_subnets) > 0 ? 1 : 0
+    count = var.assign_generated_ipv6_cidr_block && length(var.public_subnets) > 0 ? 1 : 0
     
     vpc_id = aws_vpc.main.id
 }
@@ -76,7 +76,7 @@ resource "aws_eip" "nat_gw" {
 
     tags = merge(
         var.tags,
-        {"Name" = format("%s-%s", var.vpc_name, count.index)}
+        {"Name" = format("%s-%s", var.name, count.index)}
     )
 }
 
@@ -88,7 +88,7 @@ resource "aws_nat_gateway" "main" {
 
     tags = merge(
         var.tags,
-        {"Name" = format("%s-%s", var.vpc_name, count.index)}
+        {"Name" = format("%s-%s", var.name, count.index)}
     )
 
     depends_on = [aws_internet_gateway.main]
@@ -109,7 +109,7 @@ resource "aws_subnet" "persistence" {
     tags = merge(
         var.tags,
         {
-            Name = format("%s-persistence-%s", var.vpc_name, count.index)
+            Name = format("%s-persistence-%s", var.name, count.index)
             Tier = "persistence"
         },
         var.persistence_subnets[count.index].tags
@@ -135,7 +135,7 @@ resource "aws_subnet" "private" {
     tags = merge(
         var.tags,
         {
-            Name = format("%s-private-%s", var.vpc_name, count.index)
+            Name = format("%s-private-%s", var.name, count.index)
             Tier = "private"
         },
         var.private_subnets[count.index].tags
@@ -161,7 +161,7 @@ resource "aws_subnet" "public" {
     tags = merge(
         var.tags,
         {
-            Name = format("%s-public-%s", var.vpc_name, count.index)
+            Name = format("%s-public-%s", var.name, count.index)
             Tier = "public"
         },
         var.public_subnets[count.index].tags
@@ -179,14 +179,14 @@ resource "aws_subnet" "public" {
 resource "aws_db_subnet_group" "database" {
     count = length(var.persistence_subnets) > 0 && var.create_database_subnet_group ? 1 : 0
     
-    name        = lower(var.vpc_name)
-    description = format("Database subnet group for VPC %s.", var.vpc_name)
+    name        = lower(var.name)
+    description = format("Database subnet group for VPC %s.", var.name)
     subnet_ids  = aws_subnet.persistence.*.id
     
     tags = merge(
         var.tags,
         {
-            "Name" = format("%s", var.vpc_name)
+            "Name" = format("%s", var.name)
         }
     )
 }
@@ -194,22 +194,22 @@ resource "aws_db_subnet_group" "database" {
 resource "aws_elasticache_subnet_group" "elasticache" {
     count = length(var.persistence_subnets) > 0 && var.create_elasticache_subnet_group ? 1 : 0
     
-    name        = lower(var.vpc_name)
-    description = format("ElastiCache subnet group for VPC %s.", var.vpc_name)
+    name        = lower(var.name)
+    description = format("ElastiCache subnet group for VPC %s.", var.name)
     subnet_ids  = aws_subnet.persistence.*.id
 }
 
 resource "aws_redshift_subnet_group" "redshift" {
     count = length(var.persistence_subnets) > 0 && var.create_redshift_subnet_group ? 1 : 0
     
-    name        = lower(var.vpc_name)
-    description = format("Redshift subnet group for VPC %s.", var.vpc_name)
+    name        = lower(var.name)
+    description = format("Redshift subnet group for VPC %s.", var.name)
     subnet_ids  = aws_subnet.persistence.*.id
     
     tags = merge(
         var.tags,
         {
-            "Name" = format("%s", var.vpc_name)
+            "Name" = format("%s", var.name)
         }
     )
 }
@@ -224,7 +224,7 @@ resource "aws_route_table" "persistence" {
     tags = merge(
         var.tags,
         {
-            Name = var.single_nat_gateway ? format("%s-persistence", var.vpc_name) : format("%s-persistence-%s", var.vpc_name, count.index)
+            Name = var.single_nat_gateway ? format("%s-persistence", var.name) : format("%s-persistence-%s", var.name, count.index)
         }
     )
 }
@@ -252,7 +252,7 @@ resource "aws_route_table" "private" {
     tags = merge(
         var.tags,
         {
-            Name = var.single_nat_gateway ? format("%s-private", var.vpc_name) : format("%s-private-%s", var.vpc_name, count.index)
+            Name = var.single_nat_gateway ? format("%s-private", var.name) : format("%s-private-%s", var.name, count.index)
         }
     )
 }
@@ -273,7 +273,7 @@ resource "aws_route" "private_nat_gateway" {
 }
 
 resource "aws_route" "private_ipv6_egress" {
-    count = var.vpc_assign_generated_ipv6_cidr_block ? length(var.private_subnets) : 0
+    count = var.assign_generated_ipv6_cidr_block ? length(var.private_subnets) : 0
     
     route_table_id              = element(aws_route_table.private.*.id, count.index)
     destination_ipv6_cidr_block = "::/0"
@@ -288,7 +288,7 @@ resource "aws_route_table" "public" {
     tags = merge(
         var.tags,
         {
-            Name = format("%s-public", var.vpc_name)
+            Name = format("%s-public", var.name)
         }
     )
 }
@@ -309,7 +309,7 @@ resource "aws_route" "public_internet_gateway" {
 }
 
 resource "aws_route" "public_internet_gateway_ipv6" {
-    count = var.vpc_assign_generated_ipv6_cidr_block && length(var.public_subnets) > 0 ? 1 : 0
+    count = var.assign_generated_ipv6_cidr_block && length(var.public_subnets) > 0 ? 1 : 0
     
     route_table_id              = aws_route_table.public[0].id
     destination_ipv6_cidr_block = "::/0"
@@ -327,7 +327,7 @@ resource "aws_network_acl" "persistence" {
     tags = merge(
         var.tags,
         {
-            Name = format("%s-persistence", var.vpc_name)
+            Name = format("%s-persistence", var.name)
         }
     )
 }
@@ -375,7 +375,7 @@ resource "aws_network_acl" "private" {
     tags = merge(
         var.tags,
         {
-            Name = format("%s-private", var.vpc_name)
+            Name = format("%s-private", var.name)
         }
     )
 }
@@ -423,7 +423,7 @@ resource "aws_network_acl" "public" {
     tags = merge(
         var.tags,
         {
-            Name = format("%s-public", var.vpc_name)
+            Name = format("%s-public", var.name)
         }
     )
 }
