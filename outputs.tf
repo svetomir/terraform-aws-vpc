@@ -109,9 +109,14 @@ output "egress_only_internet_gateway" {
     description = "The ID of the egress-only Internet gateway."
 }
 
-output "eip_nat_gws" {
+output "eip_nat_gateways" {
     value       = aws_eip.nat_gw
     description = "NAT gateway elastic IPs."
+}
+
+output "nat_gateways" {
+    value       = aws_nat_gateway.main
+    description = "NAT gateways."
 }
 
 output "subnets_persistence" {
