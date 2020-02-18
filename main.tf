@@ -24,6 +24,23 @@ resource "aws_vpc_ipv4_cidr_block_association" "main" {
     cidr_block = var.additional_cidrs[count.index]
 }
 
+# VPC PRIVATE DNS ZONE
+
+resource "aws_route53_zone" "private" {
+    count = var.private_dns_zone != "" ? 1 : 0
+
+    name = var.private_dns_zone
+    
+    vpc {
+        vpc_id = aws_vpc.main.id
+    }
+
+    tags = merge(
+        var.tags,
+        {"Name" = var.private_dns_zone}
+    )
+}
+
 # VPC DHCP OPTIONS
 
 resource "aws_vpc_dhcp_options" "main" {

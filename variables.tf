@@ -56,6 +56,14 @@ variable "tags" {
     description = "Key-value mapping of default tags for all IAM users."
 }
 
+# VPC PRIVATE DNS ZONE
+
+variable "private_dns_zone" {
+    type        = string
+    default     = ""
+    description = "Private DNS zone name."
+}
+
 # VPC DHCP OPTIONS
 
 variable "set_dhcp_options" {

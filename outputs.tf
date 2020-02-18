@@ -28,6 +28,7 @@ output "default_security_group_id" {
     description = "Default security group ID."
 }
 
+
 output "dhcp_options_id" {
     value       = aws_vpc.main.dhcp_options_id
     description = "DHCP options ID."
@@ -83,6 +84,10 @@ output "owner_id" {
     description = "The ID of the AWS account that owns the VPC."
 }
 
+output "route53_zone_private" {
+    value       = aws_route53_zone.private
+    description = "Private Route53 zone associated with the VPC."
+}
 
 output "vpc_dhcp_options_id" {
     value       = concat(aws_vpc_dhcp_options.main.*.id, [""])[0]
